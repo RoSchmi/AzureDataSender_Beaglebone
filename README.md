@@ -1,4 +1,4 @@
-##Beaglebone Mono C# App writes Data to Azure Storage Tables to be visualized by iOS App Charts4Azure
+*Beaglebone Mono C# App writes Data to Azure Storage Tables to be visualized by iOS App Charts4Azure
 
 Uses Microsoft Nuget Package: WindowsAzure.Storage
 
