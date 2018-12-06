@@ -43,8 +43,8 @@ namespace AzureDataSender_Beaglebone
         //******************  Settings to be changed by user   *********************************************************************
 
         // Set your Azure Storage Account Credentials here
-        static string storageAccount = "roschmi01";
-        static string storageKey = "WmyqeaAfDvUtLcSPdmDeLydIFf6kOqsVeOJBJMhcKR3RYyiB5gD0Snm0kU9sjZQgjnXXK6Ni/U2vg13DgAC6Ng==";
+        static string storageAccount = "roxxxzzz";
+        static string storageKey = "WmymeaAfDvPtLcSPdmEeLydIFf3kOqtVeOJBJMhcKR3RYyiB5gD0Slm0kU9sjZQgjnXXK6Ni/U2v513DgAC6Ng==";
 
         // Set the name of the table for analog values (name must be conform to special rules: see Azure)
         static string analogTable = "AnaRolTable";
