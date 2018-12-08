@@ -33,6 +33,7 @@ using TableStorage;
 using AzureDataSender.Models;
 using System.Globalization;
 using AzureDataSender;
+using RoSchmi.DayLihtSavingTime;
 using RoSchmi.BlackNet;
 using Digithought.BlackNet;
 
@@ -43,16 +44,22 @@ namespace AzureDataSender_Beaglebone
         //******************  Settings to be changed by user   *********************************************************************
 
         // Set your Azure Storage Account Credentials here
-        static string storageAccount = "roxxxzzz";
-        static string storageKey = "WmymeaAfDvPtLcSPdmEeLydIFf3kOqtVeOJBJMhcKR3RYyiB5gD0Slm0kU9sjZQgjnXXK6Ni/U2v513DgAC6Ng==";
+        static string storageAccount = "";
+        static string storageKey = "";
 
         // Set the name of the table for analog values (name must be conform to special rules: see Azure)
-        static string analogTable = "AnaRolTable";
+        static string analogTableName = "AnaRolTable";
+        static string analogTablePartPrefix = "Y2_";     // Your choice (name must be conform to special rules: see Azure)
 
-        static string analog_Property_1 = "T_1";  // (name must conform to special rules: see Azure)
+        // Set the names of 4 properties (Columns) of the table for analog values
+        static string analog_Property_1 = "T_1";  // Your choice (name must be conform to special rules: see Azure)
         static string analog_Property_2 = "T_2";
         static string analog_Property_3 = "T_3";
         static string analog_Property_4 = "T_4";
+
+
+
+        static string onOffTablePartPrefix = "Y3_";  // Your choice (name must be conform to special rules: see Azure)
 
         // Set parameter for 4 tables for On/Off-values (name must conform to special rules: see Azure)
         // the 4th parameter defines the name of table
@@ -67,9 +74,15 @@ namespace AzureDataSender_Beaglebone
         static int OnOffToggleInterval = 11;    // in this interval the On/Off state is toggled (test values)
         static int invalidateInterval = 900;    // if analog values ar not actualized in this interval, they are set to invalid (999.9)
 
-        //*******************************************************************************************************************************
+        
 
-        //DayLightSavingTimeSettings  (not used in this App)
+
+        //Debian prefer to keep the hardware clock in UTC
+        //Edit /etc/adjtime, and change "UTC" to "LOCAL" if you want the hardware clock to be kept at local time instead of UTC.
+
+        private static int timeZoneOffset = 60;             // offest in minutes of your timezone to Greenwich Mean Time (GMT)
+
+        //DayLightSavingTimeSettings (for format see: tz_database)
         // Europe       
         private static int dstOffset = 60; // 1 hour (Europe 2016)
         private static string dstStart = "Mar lastSun @2";
@@ -80,14 +93,19 @@ namespace AzureDataSender_Beaglebone
         private static string dstEnd = "Nov Sun>=1"; // 1st Sunday Nov (US 2013)
         */
 
-        // Define Beaglebone 4 analog inputs to read data from the ports
+        //****************  End of Settings to be changed by user   *********************************
+
+        // Define  4 analog inputs of Beaglebone to read data from the ports
         public static Ain aIn_0 = new Ain(BbbPort.P9_39);   // AIN0 - P9_39
         public static Ain aIn_1 = new Ain(BbbPort.P9_40);   // AIN1 - P9_40
         public static Ain aIn_2 = new Ain(BbbPort.P9_37);   // AIN2 - P9_37
         public static Ain aIn_3 = new Ain(BbbPort.P9_38);   // AIN3 - P9_38
 
+        // Define  up to 4 digital input(Gpio) reader instances for different Beaglebone GPIOs 
         private static BeagleGpioReader BeagleGpioReader_01 = new BeagleGpioReader(BbbPort.P8_43, "UserButton");
-
+        //private static BeagleGpioReader BeagleGpioReader_02 = new BeagleGpioReader(BbbPort.P8_14, "SomeName");
+        //private static BeagleGpioReader BeagleGpioReader_03 = new BeagleGpioReader(BbbPort.P8_16, "SomeName");
+        //private static BeagleGpioReader BeagleGpioReader_04 = new BeagleGpioReader(BbbPort.P8_18, "SomeName");
 
         public static System.Threading.Timer getSensorDataTimer = new System.Threading.Timer(new TimerCallback(getSensorDataTimer_tick), null, readInterval * 1000, Timeout.Infinite);
         public static System.Threading.Timer writeAnalogToCloudTimer = new System.Threading.Timer(new TimerCallback(writeAnalogToCloudTimer_tick), null, writeToCloudInterval * 1000, Timeout.Infinite);
@@ -107,7 +125,7 @@ namespace AzureDataSender_Beaglebone
 
         #region Main Method
         static void Main(string[] args)
-        {          
+        {
             OnOffSensor_01.digitalOnOffSensorSend += OnOffSensor_01_digitalOnOffSensorSend;
             OnOffSensor_02.digitalOnOffSensorSend += OnOffSensor_02_digitalOnOffSensorSend;
             OnOffSensor_03.digitalOnOffSensorSend += OnOffSensor_03_digitalOnOffSensorSend;
@@ -119,6 +137,9 @@ namespace AzureDataSender_Beaglebone
             OnOffSensor_04.Start();
 
             BeagleGpioReader_01.gpioStateChanged += BeagleGpioReader_01_gpioStateChanged;
+            //BeagleGpioReader_02.gpioStateChanged += BeagleGpioReader_02_gpioStateChanged;
+            //BeagleGpioReader_03.gpioStateChanged += BeagleGpioReader_03_gpioStateChanged;
+            //BeagleGpioReader_04.gpioStateChanged += BeagleGpioReader_04_gpioStateChanged;
 
             BeagleGpioReader_01.Start();
 
@@ -133,6 +154,132 @@ namespace AzureDataSender_Beaglebone
             Thread.Sleep(3000);
         }
 
+
+
+
+
+
+        #endregion
+
+        // When the timer fires, 4 analog inputs are read, the values with timestamp are stored in the data container
+        #region TimerEvent getSensorDataTimer_tick
+        private static void getSensorDataTimer_tick(object state)
+        {
+            DateTime actDateTime = DateTime.Now;
+            dataContainer.SetNewAnalogValue(1, actDateTime, ReadAnalogSensor(aIn_0));
+            Console.WriteLine("Read AIN0:" + ReadAnalogSensor(aIn_0));
+            dataContainer.SetNewAnalogValue(2, actDateTime, ReadAnalogSensor(aIn_1));
+            Console.WriteLine("Read AIN1:" + ReadAnalogSensor(aIn_1));
+            dataContainer.SetNewAnalogValue(3, actDateTime, ReadAnalogSensor(aIn_2));
+            dataContainer.SetNewAnalogValue(4, actDateTime, ReadAnalogSensor(aIn_3));
+            Console.WriteLine("Got Sensor Data");
+
+            getSensorDataTimer.Change(readInterval * 1000, Timeout.Infinite);
+        }
+        #endregion
+
+        // When the timer fires an Entity containing 4 analog values is stored in the Azure Cloud Table
+        #region Timer Event writeAnalogToCloudTimer_tick  Entity with analog values is written to the Cloud
+        private async static void writeAnalogToCloudTimer_tick(object state)
+        {
+            bool validStorageAccount = false;
+            CloudStorageAccount storageAccount = null;
+            Exception CreateStorageAccountException = null;
+            try
+            {
+                storageAccount = Common.CreateStorageAccountFromConnectionString(connectionString);
+                validStorageAccount = true;
+            }
+            catch (Exception ex0)
+            {
+                CreateStorageAccountException = ex0;
+            }
+            if (!validStorageAccount)
+            {
+                // MessageBox.Show("Storage Account not valid\r\nEnter valid Storage Account and valid Key", "Alert", MessageBoxButton.OK);
+                writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
+                return;
+            }
+            CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
+
+
+            // Create analog table if not existing           
+            //CloudTable cloudTable = tableClient.GetTableReference(analogTableName + DateTime.Today.Year);
+            DateTime timeZoneCorrectedDateTime = DateTime.Now.AddMinutes(timeZoneOffset);
+
+            // actDateTime is corrected for timeZoneOffset and DayLightSavingTime
+            DateTime actDateTime = timeZoneCorrectedDateTime.AddMinutes(GetDlstOffset(timeZoneCorrectedDateTime));
+
+            //int timeZoneAndDlstCorrectedYear = timeZoneAndDlstCorrectedDateTime.Year;
+            //CloudTable cloudTable = tableClient.GetTableReference(analogTableName + DateTime.Today.AddMinutes(timeZoneOffset).AddMinutes(GetDlstOffset()).Year);
+            CloudTable cloudTable = tableClient.GetTableReference(analogTableName + actDateTime.Year);
+
+            if (!AnalogCloudTableExists)
+            {
+                try
+                {
+                    await cloudTable.CreateIfNotExistsAsync();
+                    AnalogCloudTableExists = true;
+                }
+                catch
+                {
+                    Console.WriteLine("Could not create Analog Table with name: \r\n" + cloudTable.Name + "\r\nCheck your Internet Connection.\r\nAction aborted.");
+
+                    writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
+                    return;
+                }
+            }
+
+
+            // Populate Analog Table with Sinus Curve values for the actual day
+            // cloudTable = tableClient.GetTableReference(analogTableName + DateTime.Today.Year);
+
+            cloudTable = tableClient.GetTableReference(analogTableName + actDateTime.Year);
+
+            
+
+            // formatting the PartitionKey this way to have the tables sorted with last added row upmost
+            string partitionKey = analogTablePartPrefix + actDateTime.Year + "-" + (12 - actDateTime.Month).ToString("D2");
+           
+            // formatting the RowKey (= revereDate) this way to have the tables sorted with last added row upmost
+            string reverseDate = (10000 - actDateTime.Year).ToString("D4") + (12 - actDateTime.Month).ToString("D2") + (31 - actDateTime.Day).ToString("D2")
+                       + (23 - actDateTime.Hour).ToString("D2") + (59 - actDateTime.Minute).ToString("D2") + (59 - actDateTime.Second).ToString("D2");
+
+            string[] propertyNames = new string[4] { analog_Property_1, analog_Property_2, analog_Property_3, analog_Property_4 };
+            Dictionary<string, EntityProperty> entityDictionary = new Dictionary<string, EntityProperty>();
+            string sampleTime = actDateTime.Month.ToString("D2") + "/" + actDateTime.Day.ToString("D2") + "/" + actDateTime.Year + " " + actDateTime.Hour.ToString("D2") + ":" + actDateTime.Minute.ToString("D2") + ":" + actDateTime.Second.ToString("D2");
+            //string sampleTime = actDateTime.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+
+            entityDictionary.Add("SampleTime", EntityProperty.GeneratePropertyForString(sampleTime));
+            for (int i = 1; i < 5; i++)
+            {
+                double measuredValue = dataContainer.GetAnalogValueSet(i).MeasureValue;
+                // limit measured values to the allowed range of -40.0 to +140.0, exception: 999.9 (not valid value)
+                if ((measuredValue < 999.89) || (measuredValue > 999.91))  // want to be careful with decimal numbers
+                {
+                    measuredValue = (measuredValue < -40.0) ? -40.0 : (measuredValue > 140.0 ? 140.0 : measuredValue);
+                }
+                else
+                {
+                    measuredValue = 999.9;
+                }
+
+                entityDictionary.Add(propertyNames[i - 1], EntityProperty.GeneratePropertyForString(measuredValue.ToString("f1", System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            DynamicTableEntity sendEntity = new DynamicTableEntity(partitionKey, reverseDate, null, entityDictionary);
+
+            DynamicTableEntity dynamicTableEntity = await Common.InsertOrMergeEntityAsync(cloudTable, sendEntity);
+
+            // Set timer to fire again
+            writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
+
+            Console.WriteLine("Analog data written to Cloud");
+        }
+        #endregion
+
+        #region Region Group, Events of 4 digital Gpio Inputs, fired when Gpio State changes
+
+        #region BeagleGpioReader_01_gpioStateChanged
         private static void BeagleGpioReader_01_gpioStateChanged(BeagleGpioReader sender, BeagleGpioReader.GpioChangedEventArgs e)
         {
             Console.WriteLine("GpioEvent happened");
@@ -140,7 +287,32 @@ namespace AzureDataSender_Beaglebone
         }
         #endregion
 
-        // Change this method for a real application
+        #region BeagleGpioReader_02_gpioStateChanged
+        private static void BeagleGpioReader_02_gpioStateChanged(BeagleGpioReader sender, BeagleGpioReader.GpioChangedEventArgs e)
+        {
+            OnOffSensor_02.Input = e.ActState;
+        }
+        #endregion
+
+        #region BeagleGpioReader_03_gpioStateChanged
+        private static void BeagleGpioReader_03_gpioStateChanged(BeagleGpioReader sender, BeagleGpioReader.GpioChangedEventArgs e)
+        {
+            OnOffSensor_03.Input = e.ActState;
+        }
+        #endregion
+
+        #region BeagleGpioReader_04_gpioStateChanged
+        private static void BeagleGpioReader_04_gpioStateChanged(BeagleGpioReader sender, BeagleGpioReader.GpioChangedEventArgs e)
+        {
+            OnOffSensor_04.Input = e.ActState;
+        }
+        #endregion
+
+        #endregion
+
+        //********************************************************
+
+        // Only used when test data are sent
         #region Timer Event onOffToggleTimer_tick
         private static void onOffToggleTimer_tick(object state)
         {
@@ -167,111 +339,7 @@ namespace AzureDataSender_Beaglebone
         }
         #endregion
 
-        // When the timer fires an Entity containing the 4 analog values is stored in the Azure Cloud Table
-        #region Timer Event writeAnalogToCloudTimer_tick
-        private async static void writeAnalogToCloudTimer_tick(object state)
-        {          
-            bool validStorageAccount = false;
-            CloudStorageAccount storageAccount = null;
-            Exception CreateStorageAccountException = null;
-            try
-            {
-                storageAccount = Common.CreateStorageAccountFromConnectionString(connectionString);
-                validStorageAccount = true;
-            }
-            catch (Exception ex0)
-            {
-                CreateStorageAccountException = ex0;
-            }
-            if (!validStorageAccount)
-            {
-                // MessageBox.Show("Storage Account not valid\r\nEnter valid Storage Account and valid Key", "Alert", MessageBoxButton.OK);
-                writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
-                return;
-            }
-            CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
-
-
-            // Create analog table if not existing           
-            CloudTable cloudTable = tableClient.GetTableReference(analogTable + DateTime.Today.Year);
-
-            if (!AnalogCloudTableExists)
-            {
-                try
-                {
-                    await cloudTable.CreateIfNotExistsAsync();
-                    AnalogCloudTableExists = true;
-                }
-                catch
-                {
-                    Console.WriteLine("Could not create Analog Table with name: \r\n" + cloudTable.Name + "\r\nCheck your Internet Connection.\r\nAction aborted.");
-
-                    writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
-                    return;
-                }
-            }
-
-
-            // Populate Analog Table with Sinus Curve values for the actual day
-            cloudTable = tableClient.GetTableReference(analogTable + DateTime.Today.Year);
-
-            // formatting the PartitionKey this way to have the tables sorted with last added row upmost
-            string partitionKey = "Y2_" + DateTime.Today.Year + "-" + (12 - DateTime.Now.Month).ToString("D2");
-
-            DateTime actDate = DateTime.Now;
-
-            // formatting the RowKey (= revereDate) this way to have the tables sorted with last added row upmost
-            string reverseDate = (10000 - actDate.Year).ToString("D4") + (12 - actDate.Month).ToString("D2") + (31 - actDate.Day).ToString("D2")
-                       + (23 - actDate.Hour).ToString("D2") + (59 - actDate.Minute).ToString("D2") + (59 - actDate.Second).ToString("D2");
-
-            string[] propertyNames = new string[4] { analog_Property_1, analog_Property_2, analog_Property_3, analog_Property_4 };
-            Dictionary<string, EntityProperty> entityDictionary = new Dictionary<string, EntityProperty>();
-            string sampleTime = actDate.Month.ToString("D2") + "/" + actDate.Day.ToString("D2") + "/" + actDate.Year + " " + actDate.Hour.ToString("D2") + ":" + actDate.Minute.ToString("D2") + ":" + actDate.Second.ToString("D2");
-            //string sampleTime = actDate.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
-
-            entityDictionary.Add("SampleTime", EntityProperty.GeneratePropertyForString(sampleTime));
-            for (int i = 1; i < 5; i++)
-            {
-                double measuredValue = dataContainer.GetAnalogValueSet(i).MeasureValue;
-                // limit measured values to the allowed range of -40.0 to +140.0, exception: 999.9 (not valid value)
-                if ((measuredValue < 999.89) || (measuredValue > 999.91))  // want to be careful with decimal numbers
-                {
-                    measuredValue = (measuredValue < -40.0) ? -40.0 : (measuredValue > 140.0 ? 140.0 : measuredValue);
-                }
-                else
-                {
-                    measuredValue = 999.9;
-                }
-
-                entityDictionary.Add(propertyNames[i - 1], EntityProperty.GeneratePropertyForString(measuredValue.ToString("f1", System.Globalization.CultureInfo.InvariantCulture)));
-            }
-            DynamicTableEntity sendEntity = new DynamicTableEntity(partitionKey, reverseDate, null, entityDictionary);
-
-            DynamicTableEntity dynamicTableEntity = await Common.InsertOrMergeEntityAsync(cloudTable, sendEntity);
-          
-            writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
-
-            Console.WriteLine("Analog data written to Cloud");
-        }
-        #endregion
-
-        // When the timer fires, 4 analog inputs are read, the values and a timestamp are stored in the data container
-        #region TimerEvent getSensorDataTimer_tick
-        private static void getSensorDataTimer_tick(object state)
-        {
-            DateTime actDate = DateTime.Now;
-            dataContainer.SetNewAnalogValue(1, actDate, ReadAnalogSensor(aIn_0));
-            dataContainer.SetNewAnalogValue(2, actDate, ReadAnalogSensor(aIn_1));
-            dataContainer.SetNewAnalogValue(3, actDate, ReadAnalogSensor(aIn_2));
-            dataContainer.SetNewAnalogValue(4, actDate, ReadAnalogSensor(aIn_3));          
-            Console.WriteLine("Got Sensor Data");
-
-            getSensorDataTimer.Change(readInterval * 1000, Timeout.Infinite);
-        }
-        #endregion
-        
-        
-        // Events for 4 digital On/Off Sensors. The events are fired when the input changes its state
+        #region Region (used internally) Events for 4 digital On/Off Sensors. Events are fired when the input changes its state
         #region Event OnOffSensor_01_digitalOnOffSensorSend
         private static async void OnOffSensor_01_digitalOnOffSensorSend(OnOffDigitalSensorMgr sender, OnOffDigitalSensorMgr.OnOffSensorEventArgs e)
         {
@@ -298,6 +366,7 @@ namespace AzureDataSender_Beaglebone
         {
             await WriteOnOffEntityToCloud(e);
         }
+        #endregion
         #endregion
 
         #region ReadAnalogSensors
@@ -357,7 +426,14 @@ namespace AzureDataSender_Beaglebone
                 return;
             }
             CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
-            CloudTable cloudTable = tableClient.GetTableReference(e.DestinationTable + DateTime.Today.Year);
+
+            DateTime timeZoneCorrectedDateTime = DateTime.Now.AddMinutes(timeZoneOffset);
+
+            // actDateTime is corrected for timeZoneOffset and DayLightSavingTime
+            DateTime actDateTime = timeZoneCorrectedDateTime.AddMinutes(GetDlstOffset(timeZoneCorrectedDateTime));
+
+
+            CloudTable cloudTable = tableClient.GetTableReference(e.DestinationTable + actDateTime.Year);
 
             if (!existingOnOffTables.Contains(cloudTable.Name))
             {
@@ -374,16 +450,15 @@ namespace AzureDataSender_Beaglebone
             }
 
             // formatting the PartitionKey this way to have the tables sorted with last added row upmost
-            string partitionKey = "Y3_" + DateTime.Today.Year + "-" + (12 - DateTime.Now.Month).ToString("D2");
-
-            DateTime actDate = DateTime.Now;
+            string partitionKey = onOffTablePartPrefix + actDateTime.Year + "-" + (12 - actDateTime.Month).ToString("D2");
+          
             // formatting the RowKey this way to have the tables sorted with last added row upmost
-            string rowKey = (10000 - actDate.Year).ToString("D4") + (12 - actDate.Month).ToString("D2") + (31 - actDate.Day).ToString("D2")
-                       + (23 - actDate.Hour).ToString("D2") + (59 - actDate.Minute).ToString("D2") + (59 - actDate.Second).ToString("D2");
+            string rowKey = (10000 - actDateTime.Year).ToString("D4") + (12 - actDateTime.Month).ToString("D2") + (31 - actDateTime.Day).ToString("D2")
+                       + (23 - actDateTime.Hour).ToString("D2") + (59 - actDateTime.Minute).ToString("D2") + (59 - actDateTime.Second).ToString("D2");
 
 
-            //string sampleTime = actDate.Month.ToString("D2") + "/" + actDate.Day.ToString("D2") + "/" + actDate.Year + " " + actDate.Hour.ToString("D2") + ":" + actDate.Minute.ToString("D2") + ":" + actDate.Second.ToString("D2");
-            string sampleTime = actDate.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+            //string sampleTime = actDateTime.Month.ToString("D2") + "/" + actDateTime.Day.ToString("D2") + "/" + actDateTime.Year + " " + actDateTime.Hour.ToString("D2") + ":" + actDateTime.Minute.ToString("D2") + ":" + actDateTime.Second.ToString("D2");
+            string sampleTime = actDateTime.ToString("MM/dd/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
             TimeSpan tflSend = e.TimeFromLastSend;
             string timeFromLastSendAsString = tflSend.Days.ToString("D3") + "-" + tflSend.Hours.ToString("D2") + ":" + tflSend.Minutes.ToString("D2") + ":" + tflSend.Seconds.ToString("D2");
 
@@ -398,6 +473,13 @@ namespace AzureDataSender_Beaglebone
 
             DynamicTableEntity dynamicTableEntity = await Common.InsertOrMergeEntityAsync(cloudTable, new DynamicTableEntity(partitionKey, rowKey, null, entityDictionary));
         }
-#endregion
+        #endregion
+
+        #region Private method GetDlstOffset
+        private static int GetDlstOffset(DateTime pDateTime)
+        {
+            return DayLihtSavingTime.DayLightTimeOffset(dstStart, dstEnd, dstOffset, pDateTime, true);
+        }
+        #endregion
     }
 }

@@ -67,6 +67,7 @@
     <Compile Include="BeagleGpioReader.cs" />
     <Compile Include="Common.cs" />
     <Compile Include="DataContainer.cs" />
+    <Compile Include="DayLihtSavingTime.cs" />
     <Compile Include="Models\AnalogValueSet.cs" />
     <Compile Include="OnOffDigitalSensorMgr.cs" />
     <Compile Include="Program.cs" />
