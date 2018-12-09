@@ -61,22 +61,6 @@ namespace AzureDataSender_Beaglebone
 
         static string onOffTablePartPrefix = "Y3_";  // Your choice (name must be conform to special rules: see Azure)
 
-        // Set parameter for 4 tables for On/Off-values (name must conform to special rules: see Azure)
-        // the 4th parameter defines the name of table
-        static OnOffDigitalSensorMgr OnOffSensor_01 = new OnOffDigitalSensorMgr(dstOffset, dstStart, dstEnd, "Burner2", false, "OnOffSensor01", "undef", "undef", "undef");
-        static OnOffDigitalSensorMgr OnOffSensor_02 = new OnOffDigitalSensorMgr(dstOffset, dstStart, dstEnd, "Boiler2", false, "OnOffSensor02", "undef", "undef", "undef");
-        static OnOffDigitalSensorMgr OnOffSensor_03 = new OnOffDigitalSensorMgr(dstOffset, dstStart, dstEnd, "Pump2", false, "OnOffSensor03", "undef", "undef", "undef");
-        static OnOffDigitalSensorMgr OnOffSensor_04 = new OnOffDigitalSensorMgr(dstOffset, dstStart, dstEnd, "Heater2", false, "OnOffSensor04", "undef", "undef", "undef");
-
-        // Set intervals (in seconds)
-        static int readInterval = 4;            // in this interval analog sensors are read
-        static int writeToCloudInterval = 10;   // in this interval the analog data are stored to the cloud
-        static int OnOffToggleInterval = 11;    // in this interval the On/Off state is toggled (test values)
-        static int invalidateInterval = 900;    // if analog values ar not actualized in this interval, they are set to invalid (999.9)
-
-        
-
-
         //Debian prefer to keep the hardware clock in UTC
         //Edit /etc/adjtime, and change "UTC" to "LOCAL" if you want the hardware clock to be kept at local time instead of UTC.
 
@@ -93,6 +77,21 @@ namespace AzureDataSender_Beaglebone
         private static string dstEnd = "Nov Sun>=1"; // 1st Sunday Nov (US 2013)
         */
 
+
+        // Set parameter for 4 tables for On/Off-values (name must conform to special rules: see Azure)
+        // the 4th parameter defines the name of table
+        static OnOffDigitalSensorMgr OnOffSensor_01 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Burner2", "OnOffSensor01", true, false, "undef", "undef", "undef");
+        static OnOffDigitalSensorMgr OnOffSensor_02 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Boiler2", "OnOffSensor02", true, false, "undef", "undef", "undef");
+        static OnOffDigitalSensorMgr OnOffSensor_03 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Pump2", "OnOffSensor03", true, false, "undef", "undef", "undef");
+        static OnOffDigitalSensorMgr OnOffSensor_04 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Heater2", "OnOffSensor04", true, false, "undef", "undef", "undef");
+
+        // Set intervals (in seconds)
+        static int readInterval = 4;            // in this interval analog sensors are read
+        static int writeToCloudInterval = 10;   // in this interval the analog data are stored to the cloud
+        static int OnOffToggleInterval = 11;    // in this interval the On/Off state is toggled (test values)
+        static int invalidateInterval = 900;    // if analog values ar not actualized in this interval, they are set to invalid (999.9)
+              
+
         //****************  End of Settings to be changed by user   *********************************
 
         // Define  4 analog inputs of Beaglebone to read data from the ports
@@ -102,7 +101,7 @@ namespace AzureDataSender_Beaglebone
         public static Ain aIn_3 = new Ain(BbbPort.P9_38);   // AIN3 - P9_38
 
         // Define  up to 4 digital input(Gpio) reader instances for different Beaglebone GPIOs 
-        private static BeagleGpioReader BeagleGpioReader_01 = new BeagleGpioReader(BbbPort.P8_43, "UserButton");
+        private static BeagleGpioReader BeagleGpioReader_01 = new BeagleGpioReader(BbbPort.P8_43, "UserButton", true, false);
         //private static BeagleGpioReader BeagleGpioReader_02 = new BeagleGpioReader(BbbPort.P8_14, "SomeName");
         //private static BeagleGpioReader BeagleGpioReader_03 = new BeagleGpioReader(BbbPort.P8_16, "SomeName");
         //private static BeagleGpioReader BeagleGpioReader_04 = new BeagleGpioReader(BbbPort.P8_18, "SomeName");
@@ -282,7 +281,7 @@ namespace AzureDataSender_Beaglebone
         #region BeagleGpioReader_01_gpioStateChanged
         private static void BeagleGpioReader_01_gpioStateChanged(BeagleGpioReader sender, BeagleGpioReader.GpioChangedEventArgs e)
         {
-            Console.WriteLine("GpioEvent happened");
+            Console.WriteLine("GpioEvent happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
             OnOffSensor_01.Input = e.ActState;
         }
         #endregion
@@ -343,6 +342,7 @@ namespace AzureDataSender_Beaglebone
         #region Event OnOffSensor_01_digitalOnOffSensorSend
         private static async void OnOffSensor_01_digitalOnOffSensorSend(OnOffDigitalSensorMgr sender, OnOffDigitalSensorMgr.OnOffSensorEventArgs e)
         {
+            Console.WriteLine("On/Off-Sensor event happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
             await WriteOnOffEntityToCloud(e);
         }
         #endregion

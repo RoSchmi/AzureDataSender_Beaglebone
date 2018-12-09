@@ -1,15 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
+using RoSchmi.DayLihtSavingTime;
 
 namespace AzureDataSender
 {
     class OnOffDigitalSensorMgr
     {
-        private bool input = false;
+        private bool input = true;
+
+        private bool initialInputState = true;
 
         private InputSensorState actState = InputSensorState.Low;
         private InputSensorState oldState = InputSensorState.Low;
@@ -34,6 +37,7 @@ namespace AzureDataSender
 
         TimeSpan onTimeDay = new TimeSpan(0, 0, 0);
 
+        int timeZoneOffset = 0;
         // To mange DayLightSavingsTime (not needed on this platform)
         int dstOffset = 0;
         string dstStart = "";
@@ -48,31 +52,38 @@ namespace AzureDataSender
 
         public string DestinationTable
         {
-            get { return destinationTable;}
-            set {destinationTable = value;}
+            get { return destinationTable; }
+            set { destinationTable = value; }
         }
 
 
         Thread ReadSensorThread;
 
         #region Constructor
-        public OnOffDigitalSensorMgr(int pDstOffset, string pDstStart, string pDstEnd, string pDestinationTable = "undef", bool pInvertInputPolarity = false, string pSensorLabel = "undef", string pSensorLocation = "undef", string pMeasuredQuantity = "undef",  string pChannel = "000")
+        public OnOffDigitalSensorMgr(int pTimeZoneOffset, int pDstOffset, string pDstStart, string pDstEnd, string pDestinationTable = "undef", string pSensorLabel = "undef", bool pInitialInputState = false,  bool pInvertInputPolarity = false, string pSensorLocation = "undef", string pMeasuredQuantity = "undef", string pChannel = "000")
         {
             dstOffset = pDstOffset;
             dstStart = pDstStart;
             dstEnd = pDstEnd;
 
+            initialInputState = pInitialInputState;
+            input = pInitialInputState;
+
+            timeZoneOffset = pTimeZoneOffset;
             sensorLabel = pSensorLabel;
             sensorLocation = pSensorLocation;
             measuredQuantity = pMeasuredQuantity;
             destinationTable = pDestinationTable;
             channel = pChannel;
 
-            dateTimeOfLastSend = DateTime.Now;
+            DateTime timeZoneCorrectedDateTime = DateTime.Now.AddMinutes(timeZoneOffset);
+            
+            
+            dateTimeOfLastSend = timeZoneCorrectedDateTime.AddMinutes(GetDlstOffset.Get(timeZoneCorrectedDateTime, pDstStart, pDstEnd, pDstOffset));
 
             invertPolarity = pInvertInputPolarity;
             _stopped = true;
-            ReadSensorThread = new Thread(runReadSensorThread);
+            ReadSensorThread = new Thread(new ThreadStart(runReadSensorThread));
             ReadSensorThread.Start();
         }
         #endregion
@@ -80,21 +91,28 @@ namespace AzureDataSender
         #region runReadSensorThread
         private void runReadSensorThread()
         {
+            DateTime timeZoneCorrectedDateTime; 
+            DateTime actDateTime;
+
             while (true)
-            { 
+            {
                 if (!_stopped)
-                {
-                    if (input ^ invertPolarity== false)
+                {                 
+                    if (input ^ invertPolarity == false)
                     {
                         Thread.Sleep(20);         // debouncing
                         if (input ^ invertPolarity == false)
                         {
                             if (oldState == InputSensorState.High)
                             {
+                                timeZoneCorrectedDateTime = DateTime.Now.AddMinutes(timeZoneOffset);
+                                // actDateTime is corrected for timeZoneOffset and DayLightSavingTime
+                                actDateTime = timeZoneCorrectedDateTime.AddMinutes(GetDlstOffset.Get(timeZoneCorrectedDateTime, dstStart, dstEnd, dstOffset));
+                                
                                 actState = InputSensorState.Low;
-                                TimeSpan timeFromLastSend = DateTime.Now - dateTimeOfLastSend;                                
-                                OnDigitalOnOffSensorSend(this, new OnOffSensorEventArgs(actState, oldState, DateTime.Now, timeFromLastSend, onTimeDay, sensorLabel, sensorLocation, measuredQuantity, destinationTable, channel, false));
-                                dateTimeOfLastSend = DateTime.Now;
+                                TimeSpan timeFromLastSend = DateTime.Now - dateTimeOfLastSend;
+                                OnDigitalOnOffSensorSend(this, new OnOffSensorEventArgs(actState, oldState, actDateTime, timeFromLastSend, onTimeDay, sensorLabel, sensorLocation, measuredQuantity, destinationTable, channel, false));
+                                dateTimeOfLastSend = actDateTime;
                                 oldState = InputSensorState.Low;
                             }
                         }
@@ -105,11 +123,14 @@ namespace AzureDataSender
                     {
                         if (oldState == InputSensorState.Low)
                         {
+                            timeZoneCorrectedDateTime = DateTime.Now.AddMinutes(timeZoneOffset);
+                            // actDateTime is corrected for timeZoneOffset and DayLightSavingTime
+                            actDateTime = timeZoneCorrectedDateTime.AddMinutes(GetDlstOffset.Get(timeZoneCorrectedDateTime, dstStart, dstEnd, dstOffset));
                             actState = InputSensorState.High;
-                            TimeSpan timeFromLastSend = DateTime.Now - dateTimeOfLastSend;
+                            TimeSpan timeFromLastSend = actDateTime - dateTimeOfLastSend;
                             onTimeDay += timeFromLastSend;
-                            OnDigitalOnOffSensorSend(this, new OnOffSensorEventArgs(actState, oldState, DateTime.Now, timeFromLastSend, onTimeDay, sensorLabel, sensorLocation, measuredQuantity, destinationTable, channel, false));
-                            dateTimeOfLastSend = DateTime.Now;
+                            OnDigitalOnOffSensorSend(this, new OnOffSensorEventArgs(actState, oldState, actDateTime, timeFromLastSend, onTimeDay, sensorLabel, sensorLocation, measuredQuantity, destinationTable, channel, false));
+                            dateTimeOfLastSend = actDateTime;
                             oldState = InputSensorState.High;
                         }
                     }
@@ -130,13 +151,13 @@ namespace AzureDataSender
                             Thread.Sleep(100);
                         }
                         */
-                       
+
                         // wait on the next day
                         while (actTime.Day == DateTime.Today.Day)
                         {
                             Thread.Sleep(100);
                         }
-                        
+
                         onTimeDay = new TimeSpan(0, 0, 0);
                     }
 
@@ -145,6 +166,18 @@ namespace AzureDataSender
             }
         }
         #endregion
+
+
+        #region Class GetDlstOffset
+        public static class GetDlstOffset
+        {
+            public static int Get(DateTime pDateTime, string pDstStart, string pDstEnd, int pDstOffset)
+            {
+                return DayLihtSavingTime.DayLightTimeOffset(pDstStart, pDstEnd, pDstOffset, pDateTime, true);
+            }
+        }
+        #endregion
+
 
         #region public method Start
         public void Start()
@@ -157,7 +190,7 @@ namespace AzureDataSender
         #region public method Stop
         public void Stop()
         {
-             oldState = input ^ invertPolarity ? InputSensorState.Low : InputSensorState.High;
+            oldState = input ^ invertPolarity ? InputSensorState.Low : InputSensorState.High;
 
             _stopped = true;
         }
@@ -173,7 +206,7 @@ namespace AzureDataSender
             set
             {
                 input = value;
-            } 
+            }
         }
         #endregion
 
@@ -184,16 +217,16 @@ namespace AzureDataSender
         /// <param name="sender">The <see cref=""/> object that raised the event.</param>
         /// <param name="e">The event arguments.</param>
 
-        
+
         public delegate void digitalOnOffSensorEventhandler(OnOffDigitalSensorMgr sender, OnOffSensorEventArgs e);
 
         /// <summary>
         /// Raised when the input state has changed
         /// </summary>
         public event digitalOnOffSensorEventhandler digitalOnOffSensorSend;
-       
+
         private digitalOnOffSensorEventhandler onDigitalOnOffSensorSend;
-       
+
         private void OnDigitalOnOffSensorSend(OnOffDigitalSensorMgr sender, OnOffSensorEventArgs e)
         {
             if (this.onDigitalOnOffSensorSend == null)

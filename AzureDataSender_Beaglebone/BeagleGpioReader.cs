@@ -11,6 +11,7 @@ namespace AzureDataSender_Beaglebone
     public class BeagleGpioReader
     {
         private bool invertPolarity = false;
+        
         private InputSensorState oldState = InputSensorState.High;
         private InputSensorState actState = InputSensorState.High;
         private bool isStopped = true;
@@ -33,10 +34,12 @@ namespace AzureDataSender_Beaglebone
             High = 1
         }
 
-        public BeagleGpioReader(BbbPort pPort, string pLabel = "undef")
+        public BeagleGpioReader(BbbPort pPort, string pLabel = "undef", bool pInitialState = true, bool pInvertPolarity = false)
         {
             port = pPort;
             label = pLabel;
+            oldState = pInitialState ? InputSensorState.High : InputSensorState.Low;
+            invertPolarity = pInvertPolarity;
             gpio = new Gpio(BbbPort.P8_43, true, true);
         }
         public void Start()
