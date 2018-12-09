@@ -15,6 +15,7 @@ namespace AzureDataSender_Beaglebone
         private InputSensorState oldState = InputSensorState.High;
         private InputSensorState actState = InputSensorState.High;
         private bool isStopped = true;
+        private bool threadWasCreated = false;
         private BbbPort port;
         DateTime dateTimeOfLastAction = DateTime.MinValue;
 
@@ -45,8 +46,12 @@ namespace AzureDataSender_Beaglebone
         public void Start()
         {
             isStopped = false;
-            Thread GpioReaderThread = new Thread(new ThreadStart(RunGpioReaderThread));
-            GpioReaderThread.Start();
+            if (!threadWasCreated)
+            {
+                Thread GpioReaderThread = new Thread(new ThreadStart(RunGpioReaderThread));
+                GpioReaderThread.Start();
+                threadWasCreated = true;
+            }
         }
 
         public void Stop()
@@ -94,7 +99,7 @@ namespace AzureDataSender_Beaglebone
                             }
                         }
                     }
-                    Thread.Sleep(100);
+                    Thread.Sleep(10);
                 }
                 else
                 {

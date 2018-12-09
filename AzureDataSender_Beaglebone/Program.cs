@@ -1,5 +1,5 @@
 ﻿// Copyright RoSchmi 2018, License MIT
-// Version 1.1.1 06.12.2018
+// Version 1.1.1 09.12.2018
 // The C# Wrapper classes to access GPIOs were taken from  https://github.com/Digithought/BlackNet
 // This program is an Application for Beaglebone green (should run on -Black or other Beaglebones as well) 
 // The App writes Sample Data to Azure Storage Tables.
@@ -18,7 +18,7 @@
 // At the end of each day this App automatically sends an Entry with an 'Off' state to the cloud
 
 
-//#define UseTestValues  // if UseTestValues is active test values are transmitted to the cloud, otherwise readings from the analogPorts/digitalPorts
+//#define UseTestValues  // if UseTestValues is active, test values are transmitted to the cloud, otherwise readings from the analogPorts/digitalPorts
 
 using System;
 using System.Collections.Generic;
@@ -44,8 +44,8 @@ namespace AzureDataSender_Beaglebone
         //******************  Settings to be changed by user   *********************************************************************
 
         // Set your Azure Storage Account Credentials here
-        static string storageAccount = "";
-        static string storageKey = "";
+        static string storageAccount = "xxxyyyzzz";
+        static string storageKey = "uknd1/FYHsL3T08Xd3BdakEuMEhIJ3CRU2ZrZ6gPdD+9FyUMiigdreKIqmlxdwdMkjtvTrt2eXeGQXMLjkli==";
 
         // Set the name of the table for analog values (name must be conform to special rules: see Azure)
         static string analogTableName = "AnaRolTable";
@@ -57,8 +57,6 @@ namespace AzureDataSender_Beaglebone
         static string analog_Property_3 = "T_3";
         static string analog_Property_4 = "T_4";
 
-
-
         static string onOffTablePartPrefix = "Y3_";  // Your choice (name must be conform to special rules: see Azure)
 
         //Debian prefer to keep the hardware clock in UTC
@@ -66,7 +64,8 @@ namespace AzureDataSender_Beaglebone
 
         private static int timeZoneOffset = 60;             // offest in minutes of your timezone to Greenwich Mean Time (GMT)
 
-        //DayLightSavingTimeSettings (for format see: tz_database)
+        // DayLightSavingTimeSettings (for format see: tz_database)
+        // https://en.wikipedia.org/wiki/Tz_database
         // Europe       
         private static int dstOffset = 60; // 1 hour (Europe 2016)
         private static string dstStart = "Mar lastSun @2";
@@ -77,13 +76,12 @@ namespace AzureDataSender_Beaglebone
         private static string dstEnd = "Nov Sun>=1"; // 1st Sunday Nov (US 2013)
         */
 
-
         // Set parameter for 4 tables for On/Off-values (name must conform to special rules: see Azure)
-        // the 4th parameter defines the name of table
-        static OnOffDigitalSensorMgr OnOffSensor_01 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Burner2", "OnOffSensor01", true, false, "undef", "undef", "undef");
-        static OnOffDigitalSensorMgr OnOffSensor_02 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Boiler2", "OnOffSensor02", true, false, "undef", "undef", "undef");
-        static OnOffDigitalSensorMgr OnOffSensor_03 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Pump2", "OnOffSensor03", true, false, "undef", "undef", "undef");
-        static OnOffDigitalSensorMgr OnOffSensor_04 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Heater2", "OnOffSensor04", true, false, "undef", "undef", "undef");
+        // the 5th parameter defines the name of table, the 6th an optional label, some parameters are not used
+        static OnOffDigitalSensorMgr OnOffSensor_01 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Burnerxy", "OnOffSensor01", true, false, "undef", "undef", "undef");
+        static OnOffDigitalSensorMgr OnOffSensor_02 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Boilerxy", "OnOffSensor02", true, false, "undef", "undef", "undef");
+        static OnOffDigitalSensorMgr OnOffSensor_03 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Pumpxy", "OnOffSensor03", true, false, "undef", "undef", "undef");
+        static OnOffDigitalSensorMgr OnOffSensor_04 = new OnOffDigitalSensorMgr(timeZoneOffset, dstOffset, dstStart, dstEnd, "Heaterxy", "OnOffSensor04", true, false, "undef", "undef", "undef");
 
         // Set intervals (in seconds)
         static int readInterval = 4;            // in this interval analog sensors are read
@@ -141,15 +139,18 @@ namespace AzureDataSender_Beaglebone
             //BeagleGpioReader_04.gpioStateChanged += BeagleGpioReader_04_gpioStateChanged;
 
             BeagleGpioReader_01.Start();
+            //BeagleGpioReader_02.Start();
+            //BeagleGpioReader_03.Start();
+            //BeagleGpioReader_04.Start();
 
             dataContainer.DataInvalidateTime = new TimeSpan(0, 0, invalidateInterval);
                                  
             AnalogCloudTableExists = false;
             
-            Console.WriteLine("All commands of Main ready, halted at ManualResetEvent, Thread No.: " + Thread.CurrentThread.ManagedThreadId);
+            //Console.WriteLine("All commands of Main ready, halted at ManualResetEvent, Thread No.: " + Thread.CurrentThread.ManagedThreadId);
             manualResetEvent = new ManualResetEvent(false);
             manualResetEvent.WaitOne();
-            Console.WriteLine("Main is ending in 3 sec, Thread No.: " + Thread.CurrentThread.ManagedThreadId);
+            //Console.WriteLine("Main is ending in 3 sec, Thread No.: " + Thread.CurrentThread.ManagedThreadId);
             Thread.Sleep(3000);
         }
 
@@ -166,14 +167,14 @@ namespace AzureDataSender_Beaglebone
         {
             DateTime actDateTime = DateTime.Now;
             dataContainer.SetNewAnalogValue(1, actDateTime, ReadAnalogSensor(aIn_0));
-            Console.WriteLine("Read AIN0:" + ReadAnalogSensor(aIn_0));
+            //Console.WriteLine("Read AIN0:" + ReadAnalogSensor(aIn_0));
             dataContainer.SetNewAnalogValue(2, actDateTime, ReadAnalogSensor(aIn_1));
-            Console.WriteLine("Read AIN1:" + ReadAnalogSensor(aIn_1));
+            //Console.WriteLine("Read AIN1:" + ReadAnalogSensor(aIn_1));
             dataContainer.SetNewAnalogValue(3, actDateTime, ReadAnalogSensor(aIn_2));
             dataContainer.SetNewAnalogValue(4, actDateTime, ReadAnalogSensor(aIn_3));
-            Console.WriteLine("Got Sensor Data");
+            //Console.WriteLine("Got Sensor Data");
 
-            getSensorDataTimer.Change(readInterval * 1000, Timeout.Infinite);
+            getSensorDataTimer.Change(readInterval * 1000, 10 * 60 * 1000);    
         }
         #endregion
 
@@ -196,7 +197,7 @@ namespace AzureDataSender_Beaglebone
             if (!validStorageAccount)
             {
                 // MessageBox.Show("Storage Account not valid\r\nEnter valid Storage Account and valid Key", "Alert", MessageBoxButton.OK);
-                writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
+                writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, 30 * 60 * 1000);
                 return;
             }
             CloudTableClient tableClient = storageAccount.CreateCloudTableClient();
@@ -224,7 +225,7 @@ namespace AzureDataSender_Beaglebone
                 {
                     Console.WriteLine("Could not create Analog Table with name: \r\n" + cloudTable.Name + "\r\nCheck your Internet Connection.\r\nAction aborted.");
 
-                    writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
+                    writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, 30 * 60 * 1000);
                     return;
                 }
             }
@@ -270,9 +271,9 @@ namespace AzureDataSender_Beaglebone
             DynamicTableEntity dynamicTableEntity = await Common.InsertOrMergeEntityAsync(cloudTable, sendEntity);
 
             // Set timer to fire again
-            writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, Timeout.Infinite);
+            writeAnalogToCloudTimer.Change(writeToCloudInterval * 1000, 30 * 60 * 1000);
 
-            Console.WriteLine("Analog data written to Cloud");
+            //Console.WriteLine("Analog data written to Cloud");
         }
         #endregion
 
@@ -281,7 +282,7 @@ namespace AzureDataSender_Beaglebone
         #region BeagleGpioReader_01_gpioStateChanged
         private static void BeagleGpioReader_01_gpioStateChanged(BeagleGpioReader sender, BeagleGpioReader.GpioChangedEventArgs e)
         {
-            Console.WriteLine("GpioEvent happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
+            //Console.WriteLine("GpioEvent happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
             OnOffSensor_01.Input = e.ActState;
         }
         #endregion
@@ -316,7 +317,7 @@ namespace AzureDataSender_Beaglebone
         private static void onOffToggleTimer_tick(object state)
         {
 #if UseTestValues
-            Console.WriteLine("OnOff toggled");
+            //Console.WriteLine("OnOff toggled");
             // In this example the digital input states are toggled by a timer event
             // In a real appliction the digital input states must be set e.g. according to the state of a GPIO input
 
@@ -342,7 +343,7 @@ namespace AzureDataSender_Beaglebone
         #region Event OnOffSensor_01_digitalOnOffSensorSend
         private static async void OnOffSensor_01_digitalOnOffSensorSend(OnOffDigitalSensorMgr sender, OnOffDigitalSensorMgr.OnOffSensorEventArgs e)
         {
-            Console.WriteLine("On/Off-Sensor event happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
+            //Console.WriteLine("On/Off-Sensor event happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
             await WriteOnOffEntityToCloud(e);
         }
         #endregion
@@ -407,7 +408,7 @@ namespace AzureDataSender_Beaglebone
         static async Task WriteOnOffEntityToCloud(OnOffDigitalSensorMgr.OnOffSensorEventArgs e)
         {
 
-            Console.WriteLine("WriteOnOff to Cloud Common-method Thread-Id: " + e.DestinationTable + " "+ Thread.CurrentThread.ManagedThreadId.ToString());
+            //Console.WriteLine("WriteOnOff to Cloud Common-method Thread-Id: " + e.DestinationTable + " "+ Thread.CurrentThread.ManagedThreadId.ToString());
 
             bool validStorageAccount = false;
             CloudStorageAccount storageAccount = null;
