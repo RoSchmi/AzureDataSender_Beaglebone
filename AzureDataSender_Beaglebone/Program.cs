@@ -18,7 +18,7 @@
 // At the end of each day this App automatically sends an Entry with an 'Off' state to the cloud
 
 
-//#define UseTestValues  // if UseTestValues is active, test values are transmitted to the cloud, otherwise readings from the analogPorts/digitalPorts
+#define UseTestValues  // if UseTestValues is active, test values are transmitted to the cloud, otherwise readings from the analogPorts/digitalPorts
 
 using System;
 using System.Collections.Generic;
@@ -45,7 +45,7 @@ namespace AzureDataSender_Beaglebone
 
         // Set your Azure Storage Account Credentials here
         static string storageAccount = "xxxyyyzzz";
-        static string storageKey = "uknd1/FYHsL3T08Xd3BdakEuMEhIJ3CRU2ZrZ6gPdD+9FyUMiigdreKIqmlxdwdMkjtvTrt2eXeGQXMLjkli==";
+        static string storageKey = "o4x1/F";
 
         // Set the name of the table for analog values (name must be conform to special rules: see Azure)
         static string analogTableName = "AnaRolTable";
@@ -85,8 +85,8 @@ namespace AzureDataSender_Beaglebone
 
         // Set intervals (in seconds)
         static int readInterval = 4;            // in this interval analog sensors are read
-        static int writeToCloudInterval = 10;   // in this interval the analog data are stored to the cloud
-        static int OnOffToggleInterval = 11;    // in this interval the On/Off state is toggled (test values)
+        static int writeToCloudInterval = 600;   // in this interval the analog data are stored to the cloud
+        static int OnOffToggleInterval = 420;    // in this interval the On/Off state is toggled (test values)
         static int invalidateInterval = 900;    // if analog values ar not actualized in this interval, they are set to invalid (999.9)
               
 
@@ -165,6 +165,7 @@ namespace AzureDataSender_Beaglebone
         #region TimerEvent getSensorDataTimer_tick
         private static void getSensorDataTimer_tick(object state)
         {
+            Console.WriteLine("Going to get Sensor Data");
             DateTime actDateTime = DateTime.Now;
             dataContainer.SetNewAnalogValue(1, actDateTime, ReadAnalogSensor(aIn_0));
             //Console.WriteLine("Read AIN0:" + ReadAnalogSensor(aIn_0));
@@ -172,7 +173,7 @@ namespace AzureDataSender_Beaglebone
             //Console.WriteLine("Read AIN1:" + ReadAnalogSensor(aIn_1));
             dataContainer.SetNewAnalogValue(3, actDateTime, ReadAnalogSensor(aIn_2));
             dataContainer.SetNewAnalogValue(4, actDateTime, ReadAnalogSensor(aIn_3));
-            //Console.WriteLine("Got Sensor Data");
+            Console.WriteLine("Got Sensor Data");
 
             getSensorDataTimer.Change(readInterval * 1000, 10 * 60 * 1000);    
         }
@@ -329,7 +330,8 @@ namespace AzureDataSender_Beaglebone
             // use different intervals for 'On'- and 'Off' states
             if (OnOffSensor_01.Input == true)
             {
-                toggleInputTimer.Change(OnOffToggleInterval * 2 * 1000, Timeout.Infinite);
+                toggleInputTimer.Change(OnOffToggleInterval * 1 * 1000, Timeout.Infinite);  // Change "OnOffToggleInterval * 1 * 1000" to
+                                                                                            // "OnOffToggleInterval * 2 * 1000" for different length of intervals
             }
             else
             {
@@ -386,6 +388,7 @@ namespace AzureDataSender_Beaglebone
             }
 #else
             // Only as an example we here return values which draw a sinus curve
+            Console.WriteLine("entering Read analog sensor");
             int frequDeterminer = 4;
             int y_offset = 1;
             // different frequency and y_offset for aIn_0 to aIn_3
@@ -399,7 +402,9 @@ namespace AzureDataSender_Beaglebone
             { frequDeterminer = 16; y_offset = 30; }
 
             int secondsOnDayElapsed = DateTime.Now.Second + DateTime.Now.Minute * 60 + DateTime.Now.Hour * 60 * 60;
-            return Math.Round(2.5f * (double)Math.Sin(Math.PI / 2.0 + (secondsOnDayElapsed * ((frequDeterminer * Math.PI) / (double)86400))), y_offset);
+            Console.WriteLine("Value returned");
+            //return 1.0;
+            return Math.Round(2.5f * (double)Math.Sin(Math.PI / 2.0 + (secondsOnDayElapsed * ((frequDeterminer * Math.PI) / (double)86400))), 1) + y_offset;
 #endif
         }
         #endregion
