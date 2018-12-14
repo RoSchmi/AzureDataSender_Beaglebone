@@ -1,5 +1,5 @@
 ﻿// Copyright RoSchmi 2018, License MIT
-// Version 1.1.1 14.12.2018
+// Version 1.1.2 14.12.2018
 // The C# Wrapper classes to access GPIOs were taken from  https://github.com/Digithought/BlackNet
 // This program is an Application for Beaglebone green (should run on -Black or other Beaglebones as well) 
 // The App writes (Sample) Data to Azure Storage Tables.
