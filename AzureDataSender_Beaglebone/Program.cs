@@ -2,20 +2,40 @@
 // Version 1.1.1 14.12.2018
 // The C# Wrapper classes to access GPIOs were taken from  https://github.com/Digithought/BlackNet
 // This program is an Application for Beaglebone green (should run on -Black or other Beaglebones as well) 
-// The App writes Sample Data to Azure Storage Tables.
+// The App writes (Sample) Data to Azure Storage Tables.
 // The Cloud data are provided in special format, so that they can be graphically visualized with
 // the iOS App: Charts4Azure (available in the App Store)
 // Created are 5 Tables. Every year new tables are created (TableName + yyyy):
 // 1 Table for analog values of 4 sensors (Values must be in the range -40.0 to 140.0, not valid values are epressed as 999.9)
-// In the example the values are calculated to display sinus curves
-// For a real application you must read analog sensors an take their values (method readAnalogSensors)
+// In the #UseTestValues example the values are calculated to display sinus curves
+// For a real application you must read analog sensors and take their values (method readAnalogSensors)
 
 // 4 Tables for On/Off values for 1 digital Input each
-// In the example in a timer event the input for each table is toggled, where 
-// the timer interval for the Off-State is twice the timer interval of the On-State
+// In the #UseTestValues example in a timer event the input for each table is toggled
 // In a real application you must toggle the inputs according to the state of e.g. a GPIO pin
 // You can send the states repeatedly, only a change of the state has an effect
-// At the end of each day this App automatically sends an Entry with an 'Off' state to the cloud
+// At the end of each day this App automatically sends an Entry with an 'Off' state to the Cloud,
+// so the last 30 sec of each day are neglected
+
+// MIT License
+// Copyright(c) 2018 RoSchmi
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 
 
 //#define UseTestValues  // if UseTestValues is active, test values are transmitted to the cloud, otherwise readings from the analogPorts/digitalPorts
@@ -45,7 +65,7 @@ namespace AzureDataSender_Beaglebone
         //******************  Settings to be changed by user   *********************************************************************
 
         // Set your Azure Storage Account Credentials here
-        static string storageAccount = "your account name";
+        static string storageAccount = "your Accountname";
         static string storageKey = "your key";
 
         // Set the name of the table for analog values (name must be conform to special rules: see Azure)
@@ -157,19 +177,12 @@ namespace AzureDataSender_Beaglebone
             //Console.WriteLine("Main is ending in 3 sec, Thread No.: " + Thread.CurrentThread.ManagedThreadId);
             Thread.Sleep(3000);
         }
-
-
-
-
-
-
         #endregion
 
         // When this timer fires, 4 analog inputs are read, the values with timestamp are stored in the data container
         #region TimerEvent getSensorDataTimer_tick
         private static void getSensorDataTimer_tick(object state)
-        {
-            Console.WriteLine("Going to get Sensor Data");
+        {           
             DateTime actDateTime = DateTime.Now;
             dataContainer.SetNewAnalogValue(1, actDateTime, ReadAnalogSensor(aIn_0));
             //Console.WriteLine("Read AIN0:" + ReadAnalogSensor(aIn_0));
@@ -349,7 +362,7 @@ namespace AzureDataSender_Beaglebone
         #region Event OnOffSensor_01_digitalOnOffSensorSend
         private static async void OnOffSensor_01_digitalOnOffSensorSend(OnOffDigitalSensorMgr sender, OnOffDigitalSensorMgr.OnOffSensorEventArgs e)
         {
-            Console.WriteLine("On/Off-Sensor event happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
+            // Console.WriteLine("On/Off-Sensor event happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
             await WriteOnOffEntityToCloud(e);
         }
         #endregion
@@ -392,7 +405,7 @@ namespace AzureDataSender_Beaglebone
             }
 #else
             // Only as an example we here return values which draw a sinus curve
-            Console.WriteLine("entering Read analog sensor");
+            // Console.WriteLine("entering Read analog sensor");
             int frequDeterminer = 4;
             int y_offset = 1;
             // different frequency and y_offset for aIn_0 to aIn_3
@@ -406,7 +419,7 @@ namespace AzureDataSender_Beaglebone
             { frequDeterminer = 16; y_offset = 30; }
 
             int secondsOnDayElapsed = DateTime.Now.Second + DateTime.Now.Minute * 60 + DateTime.Now.Hour * 60 * 60;
-            Console.WriteLine("Value returned");
+            // Console.WriteLine("Value returned");
             //return 1.0;
             return Math.Round(2.5f * (double)Math.Sin(Math.PI / 2.0 + (secondsOnDayElapsed * ((frequDeterminer * Math.PI) / (double)86400))), 1) + y_offset;
 #endif

@@ -60,8 +60,7 @@ namespace AzureDataSender_Beaglebone
         }
 
         private void RunGpioReaderThread()
-        {
-            Console.WriteLine("Reached RunGpioReaderThread");
+        {            
             while (true)
             {
                 if (!isStopped)
