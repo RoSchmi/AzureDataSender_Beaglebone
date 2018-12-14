@@ -68,8 +68,7 @@ namespace AzureDataSender_Beaglebone
                 {
 
                     if (gpio.Value == 1 ^ invertPolarity == false)
-                    {
-                        //Console.WriteLine("Reached = false");
+                    {                      
                         Thread.Sleep(20);         // debouncing
                         if (gpio.Value == 1 ^ invertPolarity == false)
                         {
@@ -84,8 +83,7 @@ namespace AzureDataSender_Beaglebone
                         }
                     }
                     else
-                    {
-                        //Console.WriteLine("Reached = true");
+                    {                       
                         Thread.Sleep(20);             // (debouncing)
                         if (gpio.Value == 1 ^ invertPolarity == true)    // input still high                                     
                         {

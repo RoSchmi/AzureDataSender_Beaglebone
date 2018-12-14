@@ -1,5 +1,5 @@
 ﻿// Copyright RoSchmi 2018, License MIT
-// Version 1.1.1 09.12.2018
+// Version 1.1.1 14.12.2018
 // The C# Wrapper classes to access GPIOs were taken from  https://github.com/Digithought/BlackNet
 // This program is an Application for Beaglebone green (should run on -Black or other Beaglebones as well) 
 // The App writes Sample Data to Azure Storage Tables.
@@ -18,7 +18,7 @@
 // At the end of each day this App automatically sends an Entry with an 'Off' state to the cloud
 
 
-#define UseTestValues  // if UseTestValues is active, test values are transmitted to the cloud, otherwise readings from the analogPorts/digitalPorts
+//#define UseTestValues  // if UseTestValues is active, test values are transmitted to the cloud, otherwise readings from the analogPorts/digitalPorts
 
 using System;
 using System.Collections.Generic;
@@ -41,11 +41,12 @@ namespace AzureDataSender_Beaglebone
 {
     class Program
     {
+        #region ************  Settings to be changed by user   ***********************
         //******************  Settings to be changed by user   *********************************************************************
 
         // Set your Azure Storage Account Credentials here
-        static string storageAccount = "xxxyyyzzz";
-        static string storageKey = "o4x1/F";
+        static string storageAccount = "your account name";
+        static string storageKey = "your key";
 
         // Set the name of the table for analog values (name must be conform to special rules: see Azure)
         static string analogTableName = "AnaRolTable";
@@ -88,10 +89,12 @@ namespace AzureDataSender_Beaglebone
         static int writeToCloudInterval = 600;   // in this interval the analog data are stored to the cloud
         static int OnOffToggleInterval = 420;    // in this interval the On/Off state is toggled (test values)
         static int invalidateInterval = 900;    // if analog values ar not actualized in this interval, they are set to invalid (999.9)
-              
+
 
         //****************  End of Settings to be changed by user   *********************************
+        #endregion
 
+        #region Fields and Constants
         // Define  4 analog inputs of Beaglebone to read data from the ports
         public static Ain aIn_0 = new Ain(BbbPort.P9_39);   // AIN0 - P9_39
         public static Ain aIn_1 = new Ain(BbbPort.P9_40);   // AIN1 - P9_40
@@ -119,6 +122,7 @@ namespace AzureDataSender_Beaglebone
         const double inValidValue = 999.9;
 
         static List<string> existingOnOffTables = new List<string>();
+        #endregion
 
         #region Main Method
         static void Main(string[] args)
@@ -161,7 +165,7 @@ namespace AzureDataSender_Beaglebone
 
         #endregion
 
-        // When the timer fires, 4 analog inputs are read, the values with timestamp are stored in the data container
+        // When this timer fires, 4 analog inputs are read, the values with timestamp are stored in the data container
         #region TimerEvent getSensorDataTimer_tick
         private static void getSensorDataTimer_tick(object state)
         {
@@ -179,8 +183,8 @@ namespace AzureDataSender_Beaglebone
         }
         #endregion
 
-        // When the timer fires an Entity containing 4 analog values is stored in the Azure Cloud Table
-        #region Timer Event writeAnalogToCloudTimer_tick  Entity with analog values is written to the Cloud
+        // When this timer fires an Entity containing 4 analog values is stored to an Azure Cloud Table
+        #region Timer Event writeAnalogToCloudTimer_tick  --- Entity with analog values is written to the Cloud
         private async static void writeAnalogToCloudTimer_tick(object state)
         {
             bool validStorageAccount = false;
@@ -311,7 +315,7 @@ namespace AzureDataSender_Beaglebone
 
         #endregion
 
-        //********************************************************
+        //*********************************************************************************************
 
         // Only used when test data are sent
         #region Timer Event onOffToggleTimer_tick
@@ -345,7 +349,7 @@ namespace AzureDataSender_Beaglebone
         #region Event OnOffSensor_01_digitalOnOffSensorSend
         private static async void OnOffSensor_01_digitalOnOffSensorSend(OnOffDigitalSensorMgr sender, OnOffDigitalSensorMgr.OnOffSensorEventArgs e)
         {
-            //Console.WriteLine("On/Off-Sensor event happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
+            Console.WriteLine("On/Off-Sensor event happened. ActState = " + e.ActState.ToString() + " , oldState = " + e.OldState.ToString());
             await WriteOnOffEntityToCloud(e);
         }
         #endregion

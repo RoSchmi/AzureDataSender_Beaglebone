@@ -125,8 +125,8 @@ namespace AzureDataSender
                             }
                         }
                     }
-                    // Send an input high event (means: is off) in the last 30 seconds of each day and wait on the next day
-                                      
+
+                    // Send an input high event (means: is off) in the last 30 seconds of each day and wait on the next day                                     
                     timeZoneCorrectedDateTime = DateTime.Now.AddMinutes(timeZoneOffset);
                     actDateTime = timeZoneCorrectedDateTime.AddMinutes(GetDlstOffset.Get(timeZoneCorrectedDateTime, dstStart, dstEnd, dstOffset));
                     if (actDateTime.Hour == 23 && actDateTime.Minute == 59 && actDateTime.Second > 30)
